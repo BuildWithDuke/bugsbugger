@@ -47,7 +47,7 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /list command - show all active reminders."""
+    """Handle /list command - show all active reminders with pagination."""
     if not update.effective_user or not update.message:
         return
 
@@ -58,8 +58,31 @@ async def list_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
         await update.message.reply_text("Please /start the bot first.")
         return
 
+    # Get page number from args (default 1)
+    page = 1
+    if context.args and len(context.args) > 0:
+        try:
+            page = int(context.args[0])
+        except ValueError:
+            pass
+
     reminders = await repo.get_reminders_by_user(user.id, status="active")  # type: ignore
-    message = format_reminder_list(reminders, user)
+
+    # Pagination
+    per_page = 10
+    total_pages = (len(reminders) + per_page - 1) // per_page
+    page = max(1, min(page, total_pages)) if total_pages > 0 else 1
+
+    start_idx = (page - 1) * per_page
+    end_idx = start_idx + per_page
+    page_reminders = reminders[start_idx:end_idx]
+
+    message = format_reminder_list(page_reminders, user)
+
+    # Add pagination info if needed
+    if total_pages > 1:
+        message += f"\n\n<b>Page {page} of {total_pages}</b>\n"
+        message += f"Use <code>/list {page + 1}</code> for next page" if page < total_pages else ""
 
     await update.message.reply_html(message)
 
@@ -350,6 +373,164 @@ async def quick_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> N
     message += "\nLooks good?"
 
     await update.message.reply_html(message, reply_markup=parsed_reminder_keyboard())
+
+
+async def category_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /category command - manage categories."""
+    if not update.effective_user or not update.message:
+        return
+
+    repo: Repository = context.bot_data["repo"]
+    user = await repo.get_user_by_telegram_id(update.effective_user.id)
+
+    if not user:
+        await update.message.reply_text("Please /start the bot first.")
+        return
+
+    # Parse subcommand
+    if not context.args:
+        # List categories
+        categories = await repo.get_categories(user.id)  # type: ignore
+        if not categories:
+            await update.message.reply_text("You have no categories yet.")
+            return
+
+        message = "<b>🏷️ Your Categories</b>\n\n"
+        for cat in categories:
+            message += f"• {cat.name}\n"
+
+        message += "\n<b>Commands:</b>\n"
+        message += "<code>/category add &lt;name&gt;</code> - Add category\n"
+        message += "<code>/category delete &lt;name&gt;</code> - Remove category"
+
+        await update.message.reply_html(message)
+        return
+
+    subcommand = context.args[0].lower()
+
+    if subcommand == "add":
+        if len(context.args) < 2:
+            await update.message.reply_text("Usage: /category add <name>")
+            return
+
+        name = " ".join(context.args[1:]).lower()
+
+        # Check if already exists
+        existing = await repo.get_category_by_name(user.id, name)  # type: ignore
+        if existing:
+            await update.message.reply_text(f"Category '{name}' already exists.")
+            return
+
+        # Create
+        await repo.create_category(user.id, name)  # type: ignore
+        await update.message.reply_html(f"✓ Created category: <b>{name}</b>")
+
+    elif subcommand == "delete" or subcommand == "remove":
+        if len(context.args) < 2:
+            await update.message.reply_text("Usage: /category delete <name>")
+            return
+
+        name = " ".join(context.args[1:]).lower()
+
+        # Check if exists
+        category = await repo.get_category_by_name(user.id, name)  # type: ignore
+        if not category:
+            await update.message.reply_text(f"Category '{name}' not found.")
+            return
+
+        # Delete
+        await repo.db.execute("DELETE FROM categories WHERE id = ?", (category.id,))
+        await repo.db.commit()
+
+        await update.message.reply_html(f"🗑 Deleted category: <b>{name}</b>")
+
+    else:
+        await update.message.reply_text(
+            "Unknown subcommand. Use:\n"
+            "  /category add <name>\n"
+            "  /category delete <name>\n"
+            "  /category (to list)"
+        )
+
+
+async def edit_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /edit <id> command - edit a reminder."""
+    if not update.effective_user or not update.message:
+        return
+
+    repo: Repository = context.bot_data["repo"]
+    user = await repo.get_user_by_telegram_id(update.effective_user.id)
+
+    if not user:
+        await update.message.reply_text("Please /start the bot first.")
+        return
+
+    if not context.args or len(context.args) != 1:
+        await update.message.reply_html(
+            "<b>Usage:</b> <code>/edit &lt;reminder_id&gt;</code>\n\n"
+            "Use /list to see reminder IDs"
+        )
+        return
+
+    try:
+        reminder_id = int(context.args[0])
+    except ValueError:
+        await update.message.reply_text("Invalid reminder ID. Must be a number.")
+        return
+
+    reminder = await repo.get_reminder(reminder_id)
+
+    if not reminder or reminder.user_id != user.id:
+        await update.message.reply_text("Reminder not found.")
+        return
+
+    # Show edit options with inline keyboard
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("📝 Title", callback_data=f"edit_title:{reminder_id}"),
+            InlineKeyboardButton("📅 Date", callback_data=f"edit_date:{reminder_id}"),
+        ],
+        [
+            InlineKeyboardButton("💰 Amount", callback_data=f"edit_amount:{reminder_id}"),
+            InlineKeyboardButton("🔁 Recurrence", callback_data=f"edit_recur:{reminder_id}"),
+        ],
+        [
+            InlineKeyboardButton("🏷️ Category", callback_data=f"edit_cat:{reminder_id}"),
+            InlineKeyboardButton("❌ Cancel", callback_data=f"cancel:edit"),
+        ],
+    ])
+
+    from bugsbugger.bot.formatters import format_reminder
+
+    message = "<b>✏️ Edit Reminder</b>\n\n"
+    message += format_reminder(reminder, user)
+    message += "\n\nWhat would you like to edit?"
+
+    await update.message.reply_html(message, reply_markup=keyboard)
+
+
+async def stats_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle /stats command - show user statistics."""
+    if not update.effective_user or not update.message:
+        return
+
+    repo: Repository = context.bot_data["repo"]
+    user = await repo.get_user_by_telegram_id(update.effective_user.id)
+
+    if not user:
+        await update.message.reply_text("Please /start the bot first.")
+        return
+
+    from bugsbugger.bot.stats import format_stats_message, get_user_stats
+
+    # Get statistics
+    stats = await get_user_stats(repo, user.id)  # type: ignore
+
+    # Format and send
+    message = format_stats_message(stats)
+    await update.message.reply_html(message)
 
 
 async def handle_plain_text(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:

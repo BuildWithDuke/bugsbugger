@@ -16,8 +16,10 @@ from telegram.ext import (
 from bugsbugger.bot.callbacks import callback_router
 from bugsbugger.bot.conversations import build_add_conversation_handler
 from bugsbugger.bot.handlers import (
+    category_command,
     delete_command,
     done_command,
+    edit_command,
     escalation_command,
     handle_plain_text,
     help_command,
@@ -27,6 +29,7 @@ from bugsbugger.bot.handlers import (
     settings_command,
     snooze_command,
     start_command,
+    stats_command,
     timezone_command,
     upcoming_command,
 )
@@ -114,13 +117,16 @@ def main() -> None:
     application.add_handler(CommandHandler("upcoming", upcoming_command))
     application.add_handler(CommandHandler("done", done_command))
     application.add_handler(CommandHandler("snooze", snooze_command))
+    application.add_handler(CommandHandler("edit", edit_command))
     application.add_handler(CommandHandler("delete", delete_command))
+    application.add_handler(CommandHandler("category", category_command))
 
     # Settings commands
     application.add_handler(CommandHandler("settings", settings_command))
     application.add_handler(CommandHandler("timezone", timezone_command))
     application.add_handler(CommandHandler("quiet", quiet_command))
     application.add_handler(CommandHandler("escalation", escalation_command))
+    application.add_handler(CommandHandler("stats", stats_command))
 
     # Natural language parsing
     application.add_handler(CommandHandler("quick", quick_command))

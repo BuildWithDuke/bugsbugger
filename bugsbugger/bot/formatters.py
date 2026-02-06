@@ -111,27 +111,36 @@ I won't shut up until you pay attention. Let's get started!
 def format_help_message() -> str:
     """Format the help message."""
     return """
-<b>BugsBugger Commands</b>
+<b>BugsBugger Commands 🐰</b>
 
 <b>Creating Reminders:</b>
 /add - Guided reminder creation
-/quick - Quick add: <code>/quick rent due 1st $1500</code>
+/quick &lt;text&gt; - Quick add: <code>/quick rent due 1st $1500</code>
 Or just send plain text: "credit card payment due 15th every month"
 
 <b>Managing Reminders:</b>
-/list - All active reminders
+/list [page] - All active reminders
 /upcoming - Dashboard (next 7 days)
 /done &lt;id&gt; - Mark reminder as done
-/snooze &lt;id&gt; [duration] - Snooze a reminder
+/snooze &lt;id&gt; [mins] - Snooze a reminder
 /edit &lt;id&gt; - Edit a reminder
 /delete &lt;id&gt; - Delete a reminder
 
-<b>Settings:</b>
-/settings - Configure timezone, quiet hours, escalation
-/stats - Your nagging statistics
+<b>Organization:</b>
+/category - List all categories
+/category add &lt;name&gt; - Create category
+/category delete &lt;name&gt; - Remove category
+
+<b>Settings & Info:</b>
+/settings - View all settings
+/timezone &lt;tz&gt; - Set timezone (e.g., America/Toronto)
+/quiet &lt;start&gt; &lt;end&gt; - Set quiet hours (e.g., 23:00 07:00)
+/escalation &lt;profile&gt; - Set nag intensity (standard/gentle/aggressive)
+/stats - Your statistics & insights
 
 <b>Tips:</b>
 • When I nag you, use the buttons to quickly mark done or snooze
-• Set your timezone to see accurate local times
-• Configure quiet hours to avoid late-night nags
+• Recurring reminders auto-roll forward when marked done
+• Set your timezone and quiet hours for best experience
+• The bot gets more aggressive as deadlines approach!
 """.strip()
