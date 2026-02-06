@@ -1,0 +1,24 @@
+version: '3.8'
+
+services:
+  bugsbugger:
+    build: .
+    container_name: bugsbugger
+    restart: unless-stopped
+
+    environment:
+      - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - DATABASE_PATH=/data/bugsbugger.db
+      - LOG_LEVEL=${LOG_LEVEL:-INFO}
+      - HEARTBEAT_INTERVAL=${HEARTBEAT_INTERVAL:-60}
+      - PARSER_BACKEND=${PARSER_BACKEND:-regex}
+
+    volumes:
+      - ./data:/data
+
+    # Optional: healthcheck
+    healthcheck:
+      test: ["CMD", "python", "-c", "import sqlite3; sqlite3.connect('/data/bugsbugger.db').execute('SELECT 1')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
