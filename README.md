@@ -1,4 +1,4 @@
-# BugsBugger 🐛
+# BugsBugger 🐰
 
 > A Telegram bot that **won't shut up** about your bills and deadlines until you pay attention.
 
@@ -310,4 +310,4 @@ Found a bug? [Open an issue](https://github.com/BuildWithDuke/bugsbugger/issues)
 
 ---
 
-**Warning:** This bot is designed to be annoying. That's the point. Don't say we didn't warn you. 🐛
+**Warning:** This bot is designed to be annoying. That's the point. Don't say we didn't warn you. 🐰

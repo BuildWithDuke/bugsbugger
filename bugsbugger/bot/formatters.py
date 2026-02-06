@@ -94,7 +94,7 @@ def format_nag_message(reminder: Reminder, user: User, tier_name: str) -> str:
 def format_welcome_message() -> str:
     """Format the welcome message for /start."""
     return """
-<b>Welcome to BugsBugger!</b> 🐛
+<b>Welcome to BugsBugger!</b> 🐰
 
 I'll nag you about bills, deadlines, and events with escalating frequency until you mark them done.
 
