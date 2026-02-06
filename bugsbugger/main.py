@@ -37,6 +37,7 @@ from bugsbugger.config import Config
 from bugsbugger.db.migrations import run_migrations
 from bugsbugger.db.repository import Repository
 from bugsbugger.engine.nag_engine import heartbeat, startup_recovery
+from bugsbugger.utils.error_handler import error_handler
 
 # Configure logging
 logging.basicConfig(
@@ -134,6 +135,27 @@ def main() -> None:
     # Conversation handlers
     application.add_handler(build_add_conversation_handler())
 
+    # Edit conversation handler
+    from bugsbugger.bot.edit_handlers import (
+        EDIT_TITLE, EDIT_DATE, EDIT_AMOUNT, EDIT_RECURRENCE,
+        handle_edit_title, handle_edit_date, handle_edit_amount,
+        handle_edit_recurrence, edit_cancel
+    )
+    from telegram.ext import ConversationHandler
+
+    edit_conv_handler = ConversationHandler(
+        entry_points=[],  # Entry is via callback, not command
+        states={
+            EDIT_TITLE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_title)],
+            EDIT_DATE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_date)],
+            EDIT_AMOUNT: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_amount)],
+            EDIT_RECURRENCE: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_edit_recurrence)],
+        },
+        fallbacks=[CommandHandler("cancel", edit_cancel)],
+        per_message=False,
+    )
+    application.add_handler(edit_conv_handler)
+
     # Callback queries (buttons)
     application.add_handler(CallbackQueryHandler(callback_router))
 
@@ -141,6 +163,9 @@ def main() -> None:
     application.add_handler(
         MessageHandler(filters.TEXT & ~filters.COMMAND, handle_plain_text)
     )
+
+    # Error handler
+    application.add_error_handler(error_handler)
 
     # Start the bot
     logger.info("Starting BugsBugger bot...")

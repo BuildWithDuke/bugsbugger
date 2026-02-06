@@ -206,6 +206,62 @@ async def handle_parsed_confirmation(
     context.user_data.pop("user", None)
 
 
+async def handle_delete_confirmation(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
+    """Handle delete confirmation callbacks."""
+    if not update.callback_query:
+        return
+
+    query = update.callback_query
+    data = query.data
+
+    if not data:
+        return
+
+    await query.answer()
+
+    parts = data.split(":")
+
+    if parts[0] == "delete_confirm" and len(parts) == 2:
+        # Show confirmation
+        reminder_id = int(parts[1])
+        from telegram import InlineKeyboardButton, InlineKeyboardMarkup
+
+        keyboard = InlineKeyboardMarkup([
+            [
+                InlineKeyboardButton("✓ Yes, Delete", callback_data=f"delete_yes:{reminder_id}"),
+                InlineKeyboardButton("✗ No, Cancel", callback_data="delete_no"),
+            ]
+        ])
+
+        if query.message:
+            await query.message.edit_text(
+                "⚠️ <b>Are you sure you want to delete this reminder?</b>\n\n"
+                "This action cannot be undone.",
+                parse_mode="HTML",
+                reply_markup=keyboard
+            )
+
+    elif parts[0] == "delete_yes":
+        # Actually delete
+        reminder_id = int(parts[1])
+        repo: Repository = context.bot_data["repo"]
+
+        reminder = await repo.get_reminder(reminder_id)
+        if reminder:
+            title = reminder.title
+            await repo.delete_reminder(reminder_id)
+
+            if query.message:
+                await query.message.edit_text(f"🗑 <b>Deleted:</b> {title}", parse_mode="HTML")
+        else:
+            if query.message:
+                await query.message.edit_text("❌ Reminder not found.")
+
+    elif parts[0] == "delete_no":
+        if query.message:
+            await query.message.edit_text("✓ Delete cancelled.")
+
+
 async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
     """Route callback queries to appropriate handlers."""
     if not update.callback_query:
@@ -220,6 +276,12 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     # Parse callback data
     parts = data.split(":")
 
+    # Edit callbacks - route to edit handler
+    if parts[0].startswith("edit_"):
+        from bugsbugger.bot.edit_handlers import edit_callback_router
+        result = await edit_callback_router(update, context)
+        return  # Edit handler takes over
+
     if parts[0] == "done":
         reminder_id = int(parts[1])
         await handle_done_callback(update, context, reminder_id)
@@ -231,6 +293,9 @@ async def callback_router(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
 
     elif parts[0] == "confirm" and parts[1] == "parsed":
         await handle_parsed_confirmation(update, context)
+
+    elif parts[0] in ["delete_confirm", "delete_yes", "delete_no"]:
+        await handle_delete_confirmation(update, context)
 
     elif parts[0] == "cancel":
         if parts[1] == "parsed":

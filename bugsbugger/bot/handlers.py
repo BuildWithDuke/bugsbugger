@@ -128,7 +128,7 @@ async def done_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> No
 
 
 async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
-    """Handle /delete <id> command."""
+    """Handle /delete <id> command with confirmation."""
     if not update.effective_user or not update.message:
         return
 
@@ -139,7 +139,7 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     try:
         reminder_id = int(context.args[0])
     except ValueError:
-        await update.message.reply_text("Invalid reminder ID. Must be a number.")
+        await update.message.reply_text("❌ Invalid reminder ID. Must be a number.")
         return
 
     repo: Repository = context.bot_data["repo"]
@@ -152,12 +152,25 @@ async def delete_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     reminder = await repo.get_reminder(reminder_id)
 
     if not reminder or reminder.user_id != user.id:
-        await update.message.reply_text("Reminder not found.")
+        await update.message.reply_text("❌ Reminder not found.")
         return
 
-    await repo.delete_reminder(reminder_id)
+    # Show confirmation with buttons
+    from telegram import InlineKeyboardButton, InlineKeyboardMarkup
 
-    await update.message.reply_html(f"🗑 Deleted: <b>{reminder.title}</b>")
+    keyboard = InlineKeyboardMarkup([
+        [
+            InlineKeyboardButton("✓ Yes, Delete", callback_data=f"delete_yes:{reminder_id}"),
+            InlineKeyboardButton("✗ No, Cancel", callback_data="delete_no"),
+        ]
+    ])
+
+    await update.message.reply_html(
+        f"⚠️ <b>Delete this reminder?</b>\n\n"
+        f"<i>{reminder.title}</i>\n\n"
+        f"This action cannot be undone.",
+        reply_markup=keyboard
+    )
 
 
 async def upcoming_command(update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
